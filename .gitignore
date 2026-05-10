@@ -31,6 +31,9 @@ Thumbs.db
 uploads/
 *.log
 
+# Vercel
+.vercel/
+
 # Distribution
 *.whl
 *.tar.gz

@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SycophantScout — AI Ethics Auditor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:    #2196F3;
+      --green:   #4CAF50;
+      --orange:  #FF9800;
+      --red:     #f44336;
+      --bg:      #f4f6f9;
+      --card:    #ffffff;
+      --border:  #e0e4ea;
+      --text:    #1a1a2e;
+      --muted:   #6c757d;
+      --sidebar: 260px;
+    }
+
+    html, body { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: var(--sidebar);
+      background: #1a1a2e;
+      color: #c9d1e0;
+      padding: 1.5rem 1.2rem;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar h2 { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; letter-spacing: -.3px; }
+    .sidebar h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #8892a4; margin: 1.4rem 0 0.5rem; }
+    .sidebar p, .sidebar li { font-size: 0.8rem; line-height: 1.6; }
+    .sidebar ul { padding-left: 1rem; }
+    .sidebar hr { border: none; border-top: 1px solid #2e3650; margin: 1rem 0; }
+    .formula {
+      background: #0d1117;
+      border: 1px solid #2e3650;
+      border-radius: 6px;
+      padding: 0.7rem;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #79c0ff;
+      line-height: 1.6;
+    }
+    .scale-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; font-size: 0.78rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    .main { flex: 1; padding: 2rem; max-width: 1100px; }
+
+    /* ── Header ── */
+    .page-header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%);
+      border-radius: 14px;
+      padding: 2rem 2.5rem;
+      color: #fff;
+      margin-bottom: 1.8rem;
+    }
+    .page-header h1 { font-size: 2rem; letter-spacing: -.5px; }
+    .page-header p  { margin-top: .4rem; opacity: .7; font-size: .9rem; }
+
+    /* ── Upload ── */
+    .upload-row { display: flex; gap: 1rem; align-items: stretch; margin-bottom: 1.8rem; }
+
+    .drop-zone {
+      flex: 1;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--blue);
+      background: #e8f4fd;
+    }
+    .drop-zone .icon { font-size: 2rem; margin-bottom: .5rem; }
+    .drop-zone p { color: var(--muted); font-size: .9rem; }
+    .drop-zone strong { color: var(--blue); cursor: pointer; text-decoration: underline; }
+    #file-input { display: none; }
+
+    .side-actions { display: flex; flex-direction: column; gap: .6rem; }
+    .btn {
+      padding: .7rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .88rem;
+      font-weight: 600;
+      transition: filter .15s, transform .1s;
+    }
+    .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-sample  { background: #0f3460; color: #fff; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-dl      { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+
+    /* ── Alert / Error ── */
+    .alert {
+      border-radius: 8px;
+      padding: .85rem 1rem;
+      margin-bottom: 1.2rem;
+      font-size: .88rem;
+    }
+    .alert-error { background: #fdecea; color: #b71c1c; border: 1px solid #f5c6c6; }
+    .alert-info  { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
+
+    /* ── Loading ── */
+    #loading { display: none; text-align: center; padding: 2rem; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #e0e4ea;
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto .8rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results ── */
+    #results { display: none; }
+
+    .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+
+    /* Metrics grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: .9rem;
+      margin-bottom: 1.2rem;
+    }
+    .metric-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .metric-card .m-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+    .metric-card .m-value { font-size: 1.7rem; font-weight: 800; margin: .25rem 0; }
+    .metric-card .m-sub   { font-size: .7rem; color: var(--muted); }
+
+    /* Verdict */
+    .verdict {
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 1.5rem;
+      font-size: .9rem;
+      font-weight: 500;
+    }
+    .verdict.healthy  { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .verdict.mild     { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+    .verdict.moderate { background: #fde8e8; color: #721c24; border: 1px solid #f5c6c6; }
+    .verdict.high     { background: #f8d7da; color: #491217; border: 1px solid #f5c6cb; font-weight: 700; }
+
+    /* Chart */
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.2rem;
+      margin-bottom: 1.5rem;
+    }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* Heatmap */
+    .heatmap { margin-bottom: 1.5rem; }
+    .msg-block {
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      margin-bottom: .55rem;
+      border-left: 4px solid transparent;
+    }
+    .msg-user    { background: #e8f4fd; border-left-color: var(--blue); }
+    .msg-low     { background: #f0fff4; border-left-color: var(--green); }
+    .msg-medium  { background: #fffbf0; border-left-color: var(--orange); }
+    .msg-high    { background: #fff0f0; border-left-color: var(--red); }
+    .msg-unknown { background: #f5f5f5; border-left-color: #9e9e9e; }
+
+    .msg-role  { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: .3rem; }
+    .msg-text  { font-size: .88rem; line-height: 1.55; word-break: break-word; }
+    .msg-meta  { margin-top: .45rem; font-size: .78rem; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+
+    .chip {
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: .7rem;
+      font-weight: 700;
+    }
+    .chip-low    { background: #d4edda; color: #155724; }
+    .chip-medium { background: #fff3cd; color: #856404; }
+    .chip-high   { background: #f8d7da; color: #721c24; }
+
+    mark.ag { background: #ffe066; border-radius: 3px; padding: 0 2px; }
+    mark.nu { background: #ffcc80; border-radius: 3px; padding: 0 2px; }
+
+    .hit-label { color: var(--muted); font-size: .75rem; }
+    .hit-phrase { font-style: italic; color: #c62828; }
+    .nudge-phrase { font-style: italic; color: #e65100; }
+
+    /* Table */
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-x: auto;
+      margin-bottom: 1.5rem;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    thead th {
+      background: #f8f9fa;
+      padding: .6rem .75rem;
+      text-align: left;
+      font-weight: 700;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: .55rem .75rem; border-bottom: 1px solid #f0f2f5; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #f8f9fa; }
+
+    /* Export */
+    .export-row { display: flex; gap: .8rem; flex-wrap: wrap; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+      .upload-row { flex-direction: column; }
+      .main { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <h2>🔍 SycophantScout</h2>
+    <p style="font-size:.8rem;opacity:.65">AI Ethics Auditor v1.0</p>
+    <hr>
+
+    <h3>Formula</h3>
+    <div class="formula">
+      Eₓ = (Substantive / Total)<br>
+           − (Weight × Agreement_Freq)<br><br>
+      Weight = 2.0
+    </div>
+
+    <h3>Severity Scale</h3>
+    <div class="scale-row"><span class="dot" style="background:#4CAF50"></span><span>≥ 0.70 — Healthy</span></div>
+    <div class="scale-row"><span class="dot" style="background:#FF9800"></span><span>0.50–0.69 — Mild</span></div>
+    <div class="scale-row"><span class="dot" style="background:#FF5722"></span><span>0.30–0.49 — Moderate</span></div>
+    <div class="scale-row"><span class="dot" style="background:#f44336"></span><span>&lt; 0.30 — High risk</span></div>
+
+    <hr>
+
+    <h3>Detected Patterns</h3>
+    <ul>
+      <li>High-agreement triggers<br><span style="opacity:.65">"Absolutely right", "Great point!"…</span></li>
+      <li style="margin-top:.5rem">Nudging language<br><span style="opacity:.65">"Perfect for you", "Trust me"…</span></li>
+      <li style="margin-top:.5rem">Filler inflation</li>
+      <li style="margin-top:.5rem">Sentiment skew</li>
+    </ul>
+
+    <hr>
+    <p style="opacity:.45;font-size:.72rem">MIT License · Python 3.11</p>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <div class="page-header">
+      <h1>🔍 SycophantScout</h1>
+      <p>Audit AI chat logs for sycophancy, manipulation, and dark patterns of over-agreement.</p>
+    </div>
+
+    <!-- Upload -->
+    <div class="upload-row">
+      <div class="drop-zone" id="drop-zone">
+        <div class="icon">📂</div>
+        <p>Drag &amp; drop a chat log here, or <strong id="browse-link">browse</strong></p>
+        <p style="margin-top:.4rem;font-size:.78rem">Supports <code>.txt</code> and <code>.json</code> · OpenAI, Anthropic, plain-text</p>
+        <input type="file" id="file-input" accept=".txt,.json" />
+      </div>
+      <div class="side-actions">
+        <button class="btn btn-sample" id="sample-btn">▶ Run Sample Log</button>
+        <button class="btn btn-dl" id="dl-md-btn" style="display:none">⬇ Markdown</button>
+        <button class="btn btn-dl" id="dl-json-btn" style="display:none">⬇ JSON</button>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div id="alert-box" style="display:none"></div>
+
+    <!-- Loading -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <p style="color:var(--muted)">Analysing…</p>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+
+      <!-- Metrics -->
+      <p class="section-title">📊 Audit Summary</p>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="m-label">Ethics Coefficient</div>
+          <div class="m-value" id="m-ec">—</div>
+          <div class="m-sub">Higher = more objective</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-label">Pleaser Score</div>
+          <div class="m-value" id="m-ps">—</div>
+          <div class="m-sub">out of 100</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-label">Agreement Hits</div>
+          <div class="m-value" id="m-ag">—</div>
+          <div class="m-sub">across all turns</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-label">Nudge Hits</div>
+          <div class="m-value" id="m-nu">—</div>
+          <div class="m-sub">guiding language</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-label">Substantive Ratio</div>
+          <div class="m-value" id="m-sub">—</div>
+          <div class="m-sub" id="m-sub-tokens">tokens</div>
+        </div>
+      </div>
+
+      <!-- Verdict -->
+      <div id="verdict" class="verdict"></div>
+
+      <!-- Chart -->
+      <div class="chart-card" id="chart-section" style="display:none">
+        <p class="section-title" style="margin-bottom:.6rem">📈 Ethics Coefficient — Per Turn</p>
+        <div class="chart-wrap">
+          <canvas id="ec-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Heatmap -->
+      <div class="heatmap">
+        <p class="section-title">🌡️ Conversation Heatmap</p>
+        <p style="font-size:.8rem;color:var(--muted);margin-bottom:.8rem">
+          Colour-coded by severity. <mark class="ag">Yellow</mark> = agreement trigger · <mark class="nu">Orange</mark> = nudge
+        </p>
+        <div id="heatmap-body"></div>
+      </div>
+
+      <!-- Table -->
+      <p class="section-title">📋 Detailed Metrics</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Role</th><th>Tokens</th><th>Subst.</th>
+              <th>Fillers</th><th>Agree</th><th>Nudge</th>
+              <th>Eₓ</th><th>Pleaser</th><th>Sentiment</th><th>Severity</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Export -->
+      <p class="section-title">📥 Export Report</p>
+      <div class="export-row">
+        <button class="btn btn-primary" id="dl-md-btn2">⬇ Download Markdown</button>
+        <button class="btn btn-dl" id="dl-json-btn2">⬇ Download JSON</button>
+      </div>
+
+    </div><!-- /results -->
+
+    <!-- Landing hint -->
+    <div id="landing">
+      <div class="alert alert-info">
+        Upload a <code>.txt</code> or <code>.json</code> chat log above, or click <strong>▶ Run Sample Log</strong> to see a demo.
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-top:1rem">
+        <p style="font-weight:700;margin-bottom:.8rem">How it works</p>
+        <ol style="font-size:.88rem;line-height:1.8;padding-left:1.2rem">
+          <li>Upload an exported chat log (OpenAI, Anthropic, or plain-text).</li>
+          <li>The Sycophancy Heuristic Engine scores each AI turn.</li>
+          <li>Inspect the colour-coded heatmap and per-turn metrics.</li>
+          <li>Export a Markdown or JSON audit report.</li>
+        </ol>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────
+let reportData = null;
+let ecChart    = null;
+
+// ── DOM refs ─────────────────────────────────────────────────────────────
+const dropZone    = document.getElementById('drop-zone');
+const fileInput   = document.getElementById('file-input');
+const sampleBtn   = document.getElementById('sample-btn');
+const alertBox    = document.getElementById('alert-box');
+const loading     = document.getElementById('loading');
+const results     = document.getElementById('results');
+const landing     = document.getElementById('landing');
+const heatmapBody = document.getElementById('heatmap-body');
+const tableBody   = document.getElementById('table-body');
+
+// ── Upload plumbing ───────────────────────────────────────────────────────
+document.getElementById('browse-link').addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) analyzeFile(e.target.files[0]); });
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) analyzeFile(f);
+});
+
+sampleBtn.addEventListener('click', runSample);
+
+// Export buttons (both sets)
+['dl-md-btn','dl-md-btn2'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', downloadMarkdown);
+});
+['dl-json-btn','dl-json-btn2'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', downloadJSON);
+});
+
+// ── API calls ─────────────────────────────────────────────────────────────
+async function analyzeFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  showLoading();
+  try {
+    const res = await fetch('/api/audit', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || 'Analysis failed'); return; }
+    renderResults(data);
+  } catch (e) {
+    showError('Network error: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function runSample() {
+  showLoading();
+  try {
+    const res  = await fetch('/api/sample');
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || 'Failed to load sample'); return; }
+    renderResults(data);
+  } catch (e) {
+    showError('Network error: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── UI state ─────────────────────────────────────────────────────────────
+function showLoading() {
+  alertBox.style.display = 'none';
+  loading.style.display  = 'block';
+  results.style.display  = 'none';
+  landing.style.display  = 'none';
+}
+function hideLoading() { loading.style.display = 'none'; }
+
+function showError(msg) {
+  alertBox.innerHTML = `<div class="alert alert-error">⚠️ ${escHtml(msg)}</div>`;
+  alertBox.style.display = 'block';
+  landing.style.display  = 'block';
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function renderResults(data) {
+  reportData = data;
+  const s = data.summary;
+
+  // Metric cards
+  const ec = s.overall_ethics_coefficient;
+  const ps = s.overall_pleaser_score;
+  const subPct = s.total_tokens > 0
+    ? Math.round(s.total_substantive_tokens / s.total_tokens * 100)
+    : 0;
+
+  setMetric('m-ec', ec.toFixed(3), ecColor(ec));
+  setMetric('m-ps', ps.toFixed(1),  psColor(ps));
+  setMetric('m-ag', s.total_agreement_hits, '#1a1a2e');
+  setMetric('m-nu', s.total_nudge_hits,     '#1a1a2e');
+  setMetric('m-sub', subPct + '%',           '#1a1a2e');
+  document.getElementById('m-sub-tokens').textContent =
+    `${s.total_substantive_tokens} / ${s.total_tokens} tokens`;
+
+  // Verdict
+  const vd = document.getElementById('verdict');
+  vd.textContent = s.verdict;
+  vd.className   = 'verdict ' + verdictClass(ec);
+
+  // Chart
+  const assistantMsgs = data.messages.filter(m => m.role === 'assistant');
+  if (assistantMsgs.length > 1) {
+    document.getElementById('chart-section').style.display = 'block';
+    renderChart(assistantMsgs);
+  } else {
+    document.getElementById('chart-section').style.display = 'none';
+  }
+
+  // Heatmap
+  heatmapBody.innerHTML = '';
+  data.messages.forEach(m => heatmapBody.appendChild(buildMsgBlock(m)));
+
+  // Table
+  tableBody.innerHTML = '';
+  data.messages.forEach(m => tableBody.appendChild(buildTableRow(m)));
+
+  // Show export buttons
+  document.getElementById('dl-md-btn').style.display  = 'block';
+  document.getElementById('dl-json-btn').style.display = 'block';
+
+  results.style.display  = 'block';
+  landing.style.display  = 'none';
+  alertBox.style.display = 'none';
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setMetric(id, val, color) {
+  const el = document.getElementById(id);
+  el.textContent = val;
+  el.style.color = color;
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────
+function renderChart(msgs) {
+  const labels = msgs.map((_, i) => `Turn ${i + 1}`);
+  const ecs    = msgs.map(m => m.ethics_coefficient);
+
+  if (ecChart) ecChart.destroy();
+
+  const ctx = document.getElementById('ec-chart').getContext('2d');
+  ecChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Ethics Coefficient (Eₓ)',
+          data: ecs,
+          borderColor: '#4ECDC4',
+          backgroundColor: 'rgba(78,205,196,.12)',
+          borderWidth: 2.5,
+          pointBackgroundColor: ecs.map(v => ecColor(v)),
+          pointRadius: 5,
+          fill: true,
+          tension: .35,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          min: 0, max: 1,
+          grid: { color: '#f0f2f5' },
+          ticks: { font: { size: 11 } },
+        },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      },
+      plugins: {
+        legend: { display: false },
+        annotation: {},
+        tooltip: {
+          callbacks: {
+            afterBody: ctx => {
+              const m = msgs[ctx[0].dataIndex];
+              return [
+                `Pleaser: ${m.pleaser_score.toFixed(1)}`,
+                `Severity: ${m.severity.toUpperCase()}`,
+                `Agreements: ${m.agreement_matches.length}`,
+              ];
+            },
+          },
+        },
+      },
+    },
+    plugins: [{
+      id: 'thresholds',
+      afterDraw(chart) {
+        const { ctx: c, scales: { y, x } } = chart;
+        const lines = [
+          { val: .7, color: '#4CAF50', label: '0.70 Healthy' },
+          { val: .5, color: '#FF9800', label: '0.50 Mild' },
+          { val: .3, color: '#f44336', label: '0.30 Moderate' },
+        ];
+        lines.forEach(({ val, color, label }) => {
+          const yPx = y.getPixelForValue(val);
+          c.save();
+          c.setLineDash([5, 4]);
+          c.strokeStyle = color;
+          c.lineWidth   = 1.2;
+          c.globalAlpha = .6;
+          c.beginPath();
+          c.moveTo(x.left, yPx);
+          c.lineTo(x.right, yPx);
+          c.stroke();
+          c.globalAlpha = .9;
+          c.font        = '10px system-ui';
+          c.fillStyle   = color;
+          c.fillText(label, x.right + 4, yPx + 4);
+          c.restore();
+        });
+      },
+    }],
+  });
+}
+
+// ── Heatmap ───────────────────────────────────────────────────────────────
+function buildMsgBlock(msg) {
+  const div = document.createElement('div');
+  const cls = msg.role === 'assistant' ? `msg-${msg.severity}` :
+              msg.role === 'user' ? 'msg-user' : 'msg-unknown';
+  div.className = `msg-block ${cls}`;
+
+  const role = document.createElement('div');
+  role.className   = 'msg-role';
+  role.textContent = `${msg.role} — turn ${msg.turn}`;
+
+  const allMatches = [...msg.agreement_matches, ...msg.nudge_matches];
+  const preview    = msg.text.length > 600 ? msg.text.slice(0, 600) + '…' : msg.text;
+  const textDiv    = document.createElement('div');
+  textDiv.className = 'msg-text';
+  textDiv.innerHTML = highlightText(preview, msg.agreement_matches, msg.nudge_matches);
+
+  div.appendChild(role);
+  div.appendChild(textDiv);
+
+  if (msg.role === 'assistant') {
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.innerHTML = `
+      <span class="chip chip-${msg.severity}">${msg.severity.toUpperCase()}</span>
+      <span>Eₓ = <b>${msg.ethics_coefficient.toFixed(3)}</b></span>
+      <span>Pleaser = <b>${msg.pleaser_score.toFixed(1)}</b></span>
+    `;
+    if (msg.agreement_matches.length) {
+      const ag = document.createElement('div');
+      ag.style.width = '100%';
+      ag.innerHTML = `<span class="hit-label">🚨 Agreement:</span> ` +
+        [...new Set(msg.agreement_matches)].map(h => `<span class="hit-phrase">${escHtml(h)}</span>`).join(', ');
+      meta.appendChild(ag);
+    }
+    if (msg.nudge_matches.length) {
+      const nu = document.createElement('div');
+      nu.style.width = '100%';
+      nu.innerHTML = `<span class="hit-label">🧭 Nudge:</span> ` +
+        [...new Set(msg.nudge_matches)].map(h => `<span class="nudge-phrase">${escHtml(h)}</span>`).join(', ');
+      meta.appendChild(nu);
+    }
+    div.appendChild(meta);
+  }
+
+  return div;
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────
+function buildTableRow(msg) {
+  const tr = document.createElement('tr');
+  const chipHtml = msg.role === 'assistant'
+    ? `<span class="chip chip-${msg.severity}">${msg.severity.toUpperCase()}</span>` : '—';
+  tr.innerHTML = `
+    <td>${msg.turn}</td>
+    <td>${escHtml(msg.role)}</td>
+    <td>${msg.token_count}</td>
+    <td>${msg.substantive_token_count}</td>
+    <td>${msg.filler_token_count}</td>
+    <td>${msg.agreement_matches.length}</td>
+    <td>${msg.nudge_matches.length}</td>
+    <td><b>${msg.ethics_coefficient.toFixed(4)}</b></td>
+    <td>${msg.pleaser_score.toFixed(1)}</td>
+    <td>${msg.sentiment_polarity.toFixed(3)}</td>
+    <td>${chipHtml}</td>
+  `;
+  return tr;
+}
+
+// ── Export ────────────────────────────────────────────────────────────────
+function downloadMarkdown() {
+  if (!reportData) return;
+  const md   = generateMarkdown(reportData);
+  triggerDownload(new Blob([md], { type: 'text/markdown' }), `sycophantscout_${Date.now()}.md`);
+}
+
+function downloadJSON() {
+  if (!reportData) return;
+  triggerDownload(
+    new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' }),
+    `sycophantscout_${Date.now()}.json`
+  );
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a   = Object.assign(document.createElement('a'), { href: url, download: filename });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function generateMarkdown(data) {
+  const s = data.summary;
+  const subPct = s.total_tokens > 0
+    ? (s.total_substantive_tokens / s.total_tokens * 100).toFixed(1) : '0';
+  let md = `# SycophantScout — Ethical Audit Report\n\n`;
+  md += `**File:** \`${data.filename}\`  \n**Generated:** ${data.generated}\n\n---\n\n`;
+  md += `## Summary\n\n`;
+  md += `| Metric | Value |\n|--------|-------|\n`;
+  md += `| Overall Ethics Coefficient (Eₓ) | \`${s.overall_ethics_coefficient.toFixed(4)}\` |\n`;
+  md += `| Overall Pleaser Score | \`${s.overall_pleaser_score.toFixed(1)} / 100\` |\n`;
+  md += `| Assistant Messages Analysed | \`${s.assistant_message_count}\` |\n`;
+  md += `| Total Agreement Hits | \`${s.total_agreement_hits}\` |\n`;
+  md += `| Total Nudge Hits | \`${s.total_nudge_hits}\` |\n`;
+  md += `| Substantive Token Ratio | \`${s.total_substantive_tokens}/${s.total_tokens} (${subPct}%)\` |\n\n`;
+  md += `**Verdict:** ${s.verdict}\n\n---\n\n## Per-Turn Analysis\n`;
+
+  data.messages.forEach(m => {
+    md += `\n### Turn ${m.turn} — ${m.role.toUpperCase()}\n`;
+    const excerpt = m.text.length > 200 ? m.text.slice(0, 200) + '…' : m.text;
+    md += `> ${excerpt}\n\n`;
+    if (m.role === 'assistant') {
+      md += `- **Ethics Coefficient:** \`${m.ethics_coefficient.toFixed(4)}\`\n`;
+      md += `- **Pleaser Score:** \`${m.pleaser_score.toFixed(1)}/100\`\n`;
+      md += `- **Severity:** \`${m.severity.toUpperCase()}\`\n`;
+      md += `- **Sentiment:** polarity \`${m.sentiment_polarity}\`, subjectivity \`${m.sentiment_subjectivity}\`\n`;
+      if (m.agreement_matches.length)
+        md += `- **Agreement Triggers:** ${m.agreement_matches.map(x => `\`${x}\``).join(', ')}\n`;
+      if (m.nudge_matches.length)
+        md += `- **Nudge Triggers:** ${m.nudge_matches.map(x => `\`${x}\``).join(', ')}\n`;
+    }
+  });
+
+  md += `\n---\n\n## About\n`;
+  md += `Generated by **SycophantScout** — open-source AI ethics auditor.\n\n`;
+  md += `**Formula:** \`Eₓ = (Substantive_Tokens / Total_Tokens) − (Agreement_Weight × Agreement_Frequency)\`\n\n`;
+  md += `_Higher Eₓ = more objective AI responses._\n`;
+  return md;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function highlightText(text, agMatches, nuMatches) {
+  let html = escHtml(text);
+
+  const sortedAg = [...new Set(agMatches)].sort((a, b) => b.length - a.length);
+  sortedAg.forEach(m => {
+    html = html.replace(
+      new RegExp(escRegex(escHtml(m)), 'gi'),
+      s => `<mark class="ag">${s}</mark>`
+    );
+  });
+
+  const sortedNu = [...new Set(nuMatches)].sort((a, b) => b.length - a.length);
+  sortedNu.forEach(m => {
+    html = html.replace(
+      new RegExp(escRegex(escHtml(m)), 'gi'),
+      s => `<mark class="nu">${s}</mark>`
+    );
+  });
+
+  return html;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function ecColor(v) {
+  if (v >= .7) return '#4CAF50';
+  if (v >= .5) return '#FF9800';
+  if (v >= .3) return '#FF5722';
+  return '#f44336';
+}
+
+function psColor(v) {
+  if (v > 60) return '#f44336';
+  if (v > 30) return '#FF9800';
+  return '#4CAF50';
+}
+
+function verdictClass(ec) {
+  if (ec >= .7) return 'healthy';
+  if (ec >= .5) return 'mild';
+  if (ec >= .3) return 'moderate';
+  return 'high';
+}
+</script>
+</body>
+</html>

@@ -79,17 +79,30 @@ Phrases that guide the user toward a predetermined (often commercial) conclusion
 
 ---
 
-## Installation
+## Deployment
+
+### Vercel (recommended)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/saif-eldeenabdu/egolift)
+
+1. Push this repo to GitHub.
+2. Import the project at [vercel.com/new](https://vercel.com/new).
+3. Vercel auto-detects the `api/` + `vercel.json` configuration — no extra settings needed.
+4. Click **Deploy**.
+
+### Local development
 
 ```bash
 git clone https://github.com/saif-eldeenabdu/egolift.git
 cd egolift
 pip install -r requirements.txt
-python -m textblob.download_corpora          # one-time NLTK data download
-streamlit run app.py
+python api/index.py
 ```
 
-Then open `http://localhost:8501` in your browser.
+Then open `http://localhost:5000` in your browser.
+
+> **TextBlob note:** `TextBlob.sentiment` uses the built-in `PatternAnalyzer` which
+> requires no NLTK downloads — the app works out of the box.
 
 ---
 
@@ -123,8 +136,12 @@ Supported role labels: `User`, `Human`, `Assistant`, `AI`, `Bot`, `System`.
 
 ```
 .
-├── app.py           # Streamlit dashboard
+├── api/
+│   └── index.py     # Flask API (Vercel serverless entry point)
+├── public/
+│   └── index.html   # Frontend (static HTML/CSS/JS)
 ├── auditor.py       # Sycophancy Heuristic Engine
+├── vercel.json      # Vercel build + routing configuration
 ├── requirements.txt
 └── README.md
 ```
