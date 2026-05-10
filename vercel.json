@@ -1,18 +1,10 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": ["auditor.py", "public/index.html"]
-      }
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{auditor.py,public/index.html}"
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.py"
-    }
+  },
+  "rewrites": [
+    { "source": "/:path*", "destination": "/api/index.py" }
   ]
 }
