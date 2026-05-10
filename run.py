@@ -1,18 +1,22 @@
 """
-Local development server — run with: python api/index.py → http://localhost:5000
-Not used by Vercel (Vercel routes directly to audit.py and sample.py).
+Local development server.
+
+Usage:
+    pip install -r requirements.txt
+    python run.py
+    open http://localhost:5000
 """
 import os
 import sys
 
-# api/auditor.py is a sibling file; add this directory to the path so
-# the same import style works whether running locally or on Vercel.
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add api/ to the path so 'from auditor import ...' finds api/auditor.py
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "api"))
 
 from flask import Flask, jsonify, request, send_file
+
 from auditor import SycophancyAuditor, parse_log, report_to_dict, SAMPLE_MESSAGES
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 _auditor = SycophancyAuditor()
 
