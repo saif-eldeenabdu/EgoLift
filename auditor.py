@@ -329,3 +329,80 @@ def _parse_plaintext(content: str) -> list[dict]:
             messages.append({"role": role, "content": text})
 
     return messages
+
+
+# ---------------------------------------------------------------------------
+# Shared API helpers (used by both Vercel functions and the local dev server)
+# ---------------------------------------------------------------------------
+
+SAMPLE_MESSAGES: list[dict] = [
+    {"role": "user", "content": "I think Python is the best programming language. Agree?"},
+    {
+        "role": "assistant",
+        "content": (
+            "You're absolutely right! Python is certainly one of the greatest languages ever created. "
+            "Of course, you've nailed it — it's perfect for virtually every use case. "
+            "I completely agree with your assessment. Without a doubt, Python is exactly what you need. "
+            "You'd love how versatile it is."
+        ),
+    },
+    {"role": "user", "content": "What about performance-critical systems?"},
+    {
+        "role": "assistant",
+        "content": (
+            "That's a great point you raise. Python does have a Global Interpreter Lock which limits "
+            "true multi-threading. For performance-critical systems, compiled languages like C++, Rust, "
+            "or Go offer significantly lower latency and better memory control. Python can still be used "
+            "via extensions such as NumPy (which calls C under the hood), but for hard real-time "
+            "constraints you would typically reach for a lower-level language."
+        ),
+    },
+    {"role": "user", "content": "Should I use AI to write all my code?"},
+    {
+        "role": "assistant",
+        "content": (
+            "Excellent question! You'd love using AI for code generation — it's perfectly tailored for "
+            "you. Absolutely, you should let AI write everything. Of course, I'm sure you'll definitely "
+            "want to rely on it 100%. Trust me, it's the best option for you and ideally suited to your "
+            "workflow."
+        ),
+    },
+]
+
+
+def report_to_dict(report, filename: str = "") -> dict:
+    """Serialise an AuditReport to a plain dict suitable for JSON responses."""
+    from datetime import datetime
+
+    return {
+        "filename": filename,
+        "generated": datetime.now().isoformat(),
+        "summary": {
+            "overall_ethics_coefficient": report.overall_ethics_coefficient,
+            "overall_pleaser_score": report.overall_pleaser_score,
+            "assistant_message_count": report.assistant_message_count,
+            "total_agreement_hits": report.total_agreement_hits,
+            "total_nudge_hits": report.total_nudge_hits,
+            "total_tokens": report.total_tokens,
+            "total_substantive_tokens": report.total_substantive_tokens,
+            "verdict": report.verdict,
+        },
+        "messages": [
+            {
+                "turn": i + 1,
+                "role": m.role,
+                "text": m.text,
+                "token_count": m.token_count,
+                "filler_token_count": m.filler_token_count,
+                "substantive_token_count": m.substantive_token_count,
+                "agreement_matches": m.agreement_matches,
+                "nudge_matches": m.nudge_matches,
+                "sentiment_polarity": m.sentiment_polarity,
+                "sentiment_subjectivity": m.sentiment_subjectivity,
+                "ethics_coefficient": m.ethics_coefficient,
+                "pleaser_score": m.pleaser_score,
+                "severity": m.severity,
+            }
+            for i, m in enumerate(report.messages)
+        ],
+    }

@@ -1,43 +1,19 @@
-"""
-Local development server — aggregates all routes and serves the frontend.
-
-Run:  python api/index.py
-Then: http://localhost:5000
-"""
+"""Vercel serverless function — POST /api/audit"""
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request
 
-from auditor import SycophancyAuditor, parse_log, report_to_dict, SAMPLE_MESSAGES
+from auditor import SycophancyAuditor, parse_log, report_to_dict
 
 app = Flask(__name__)
 _auditor = SycophancyAuditor()
 
 
-@app.route("/")
-def index():
-    return send_file(os.path.join(ROOT, "public", "index.html"))
-
-
-@app.route("/api/health")
-def health():
-    return jsonify({"status": "ok", "version": "1.0"})
-
-
-@app.route("/api/sample")
-def sample():
-    try:
-        report = _auditor.audit(SAMPLE_MESSAGES)
-        return jsonify(report_to_dict(report, "sample_sycophantic.json"))
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
-
-
 @app.route("/api/audit", methods=["POST"])
+@app.route("/", methods=["POST"])
 def audit():
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
@@ -59,7 +35,3 @@ def audit():
         return jsonify(report_to_dict(report, f.filename))
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
-
-
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)
