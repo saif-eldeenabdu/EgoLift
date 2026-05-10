@@ -1,11 +1,5 @@
 """Vercel serverless function — GET /api/sample"""
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from flask import Flask, jsonify
-
 from auditor import SycophancyAuditor, report_to_dict, SAMPLE_MESSAGES
 
 app = Flask(__name__)

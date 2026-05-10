@@ -1,19 +1,18 @@
 """
-Local development server — aggregates all routes and serves the frontend.
-
-Run:  python api/index.py
-Then: http://localhost:5000
+Local development server — run with: python api/index.py → http://localhost:5000
+Not used by Vercel (Vercel routes directly to audit.py and sample.py).
 """
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+# api/auditor.py is a sibling file; add this directory to the path so
+# the same import style works whether running locally or on Vercel.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request, send_file
-
 from auditor import SycophancyAuditor, parse_log, report_to_dict, SAMPLE_MESSAGES
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 app = Flask(__name__)
 _auditor = SycophancyAuditor()
 

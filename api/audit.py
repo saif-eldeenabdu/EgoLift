@@ -1,11 +1,5 @@
 """Vercel serverless function — POST /api/audit"""
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from flask import Flask, jsonify, request
-
 from auditor import SycophancyAuditor, parse_log, report_to_dict
 
 app = Flask(__name__)
